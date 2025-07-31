@@ -1,0 +1,50 @@
+# Binários
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+
+# Arquivos de teste
+*.test
+
+# Arquivos de cobertura
+*.out
+
+# Arquivos de vendoring do Go
+vendor/
+
+# Arquivos específicos do GoLand
+.idea/
+
+# Arquivos específicos do VS Code
+.vscode/
+
+# Arquivos de log
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# Arquivos do OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/
+build/
+
+# Go sum lock files (são commitados, mas podem ser ignorados se necessário)
+# go.sum
