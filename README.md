@@ -241,9 +241,8 @@ docker-compose up --build
 2. Execute `make dev` para rebuild e restart
 3. Teste as alterações com `make test`
 
-## Métricas e Monitoramento
+## Monitoramento
 
-- **OpenTelemetry Collector Metrics**: http://localhost:8888/metrics
 - **Zipkin UI**: http://localhost:9411
 - **Health Checks**: 
   - http://localhost:8081/health

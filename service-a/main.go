@@ -141,6 +141,7 @@ func initTracer() error {
 	}
 
 	// Configuração do exporter OTLP usando grpc.NewClient
+	otlpEndpoint = strings.TrimPrefix(otlpEndpoint, "http://")
 	conn, err := grpc.NewClient(
 		otlpEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
