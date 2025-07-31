@@ -33,34 +33,54 @@ logs-otel:
 dev:
 	docker-compose up --build
 
-# Testar o serviço A
-test-service-a:
-	@echo "Testando Serviço A..."
-	@echo "Teste 1: CEP válido (01310-100)"
-	curl -X POST http://localhost:8081 \
-		-H "Content-Type: application/json" \
-		-d '{"cep": "01310100"}' | jq .
-	@echo "\nTeste 2: CEP inválido (formato)"
-	curl -X POST http://localhost:8081 \
-		-H "Content-Type: application/json" \
-		-d '{"cep": "123"}' | jq .
-	@echo "\nTeste 3: CEP não encontrado"
-	curl -X POST http://localhost:8081 \
-		-H "Content-Type: application/json" \
-		-d '{"cep": "99999999"}' | jq .
+# Verificar se os serviços estão funcionando
+check-services:
+	@echo "Verificando se os serviços estão rodando..."
+	@docker-compose ps
+	@echo "\nVerificando conectividade dos serviços..."
+	@echo "Testando Serviço A (porta 8081):"
+	@timeout 5 bash -c 'until curl -s http://localhost:8081/health > /dev/null; do echo "Aguardando Serviço A..."; sleep 1; done' || echo "Serviço A não está respondendo"
+	@echo "Testando Serviço B (porta 8082):"
+	@timeout 5 bash -c 'until curl -s http://localhost:8082/health > /dev/null; do echo "Aguardando Serviço B..."; sleep 1; done' || echo "Serviço B não está respondendo"
 
-# Testar o serviço B diretamente
+# Testar o serviço A com tratamento de erro melhorado
+test-service-a:
+	@echo "========================================="
+	@echo "Testando Serviço A..."
+	@echo "========================================="
+	@echo "\nTeste 1: CEP válido (01310-100)"
+	@curl -s -w "\nStatus: %{http_code}\n" -X POST http://localhost:8081 \
+		-H "Content-Type: application/json" \
+		-d '{"cep": "01310100"}' || echo "Erro na requisição"
+	@echo "\n-----------------------------------------"
+	@echo "Teste 2: CEP inválido (formato)"
+	@curl -s -w "\nStatus: %{http_code}\n" -X POST http://localhost:8081 \
+		-H "Content-Type: application/json" \
+		-d '{"cep": "123"}' || echo "Erro na requisição"
+	@echo "\n-----------------------------------------"
+	@echo "Teste 3: CEP não encontrado"
+	@curl -s -w "\nStatus: %{http_code}\n" -X POST http://localhost:8081 \
+		-H "Content-Type: application/json" \
+		-d '{"cep": "99999999"}' || echo "Erro na requisição"
+	@echo "\n========================================="
+
+# Testar o serviço B diretamente com tratamento de erro melhorado
 test-service-b:
+	@echo "========================================="
 	@echo "Testando Serviço B..."
-	@echo "Teste 1: CEP válido (01310-100)"
-	curl http://localhost:8082/01310100 | jq .
-	@echo "\nTeste 2: CEP inválido (formato)"
-	curl http://localhost:8082/123 | jq .
-	@echo "\nTeste 3: CEP não encontrado"
-	curl http://localhost:8082/99999999 | jq .
+	@echo "========================================="
+	@echo "\nTeste 1: CEP válido (01310-100)"
+	@curl -s -w "\nStatus: %{http_code}\n" http://localhost:8082/01310100 || echo "Erro na requisição"
+	@echo "\n-----------------------------------------"
+	@echo "Teste 2: CEP inválido (formato)"
+	@curl -s -w "\nStatus: %{http_code}\n" http://localhost:8082/123 || echo "Erro na requisição"
+	@echo "\n-----------------------------------------"
+	@echo "Teste 3: CEP não encontrado"
+	@curl -s -w "\nStatus: %{http_code}\n" http://localhost:8082/99999999 || echo "Erro na requisição"
+	@echo "\n========================================="
 
 # Executar todos os testes
-test: test-service-a test-service-b
+test: check-services test-service-a test-service-b
 
 # Verificar status dos serviços
 status:
@@ -70,9 +90,28 @@ status:
 # Health check dos serviços
 health:
 	@echo "Health check Serviço A:"
-	curl http://localhost:8081/health | jq .
+	@curl -s http://localhost:8081/health || echo "Serviço A não está respondendo"
 	@echo "\nHealth check Serviço B:"
-	curl http://localhost:8082/health | jq .
+	@curl -s http://localhost:8082/health || echo "Serviço B não está respondendo"
+
+# Debug - ver logs dos últimas 50 linhas de cada serviço
+debug:
+	@echo "========================================="
+	@echo "Logs do Serviço A (últimas 50 linhas):"
+	@echo "========================================="
+	@docker-compose logs --tail=50 service-a
+	@echo "\n========================================="
+	@echo "Logs do Serviço B (últimas 50 linhas):"
+	@echo "========================================="
+	@docker-compose logs --tail=50 service-b
+	@echo "\n========================================="
+	@echo "Logs do OTEL Collector (últimas 50 linhas):"
+	@echo "========================================="
+	@docker-compose logs --tail=50 otel-collector
+
+# Restart dos serviços
+restart:
+	docker-compose restart
 
 # Abrir Zipkin no navegador (macOS)
 zipkin:
@@ -91,9 +130,25 @@ clean:
 	docker-compose down -v
 	docker system prune -f
 
-# Setup completo (build + up + test)
+# Setup completo (build + up + wait + test)
 setup: build up
-	@echo "Aguardando serviços iniciarem..."
-	sleep 10
-	$(MAKE) health
-	$(MAKE) urls
+	@echo "Aguardando serviços iniciarem... (30 segundos)"
+	@sleep 30
+	@$(MAKE) check-services
+	@$(MAKE) health
+	@$(MAKE) urls
+
+# Diagnosticar problemas
+diagnose:
+	@echo "========================================="
+	@echo "DIAGNÓSTICO DO SISTEMA"
+	@echo "========================================="
+	@echo "1. Status dos containers:"
+	@docker-compose ps
+	@echo "\n2. Portas em uso:"
+	@netstat -tlnp | grep -E ':808[12]|:9411|:4317' || echo "Nenhuma porta dos serviços encontrada"
+	@echo "\n3. Testando conectividade:"
+	@timeout 2 curl -s http://localhost:8081/health && echo "✓ Serviço A OK" || echo "✗ Serviço A não responde"
+	@timeout 2 curl -s http://localhost:8082/health && echo "✓ Serviço B OK" || echo "✗ Serviço B não responde"
+	@echo "\n4. Logs recentes dos serviços:"
+	@$(MAKE) debug

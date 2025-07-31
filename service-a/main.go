@@ -140,17 +140,14 @@ func initTracer() error {
 		otlpEndpoint = "localhost:4317"
 	}
 
-	// Configuração do exporter OTLP
-	conn, err := grpc.DialContext(
-		context.Background(),
+	// Configuração do exporter OTLP usando grpc.NewClient
+	conn, err := grpc.NewClient(
 		otlpEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	if err != nil {
 		return fmt.Errorf("erro ao conectar com OTLP endpoint: %w", err)
 	}
-	fmt.Println("cheguei ate aqui")
 
 	exporter, err := otlptracegrpc.New(context.Background(), otlptracegrpc.WithGRPCConn(conn))
 	if err != nil {
